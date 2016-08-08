@@ -6,8 +6,7 @@ import logging
 
 
 def main():
-    socketio.run(server)
-    # server.run(debug=True)
+    server.run(debug=True)
 
 
 if __name__ == '__main__':

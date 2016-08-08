@@ -18,7 +18,6 @@ startedDownloads = []
 handlerLst = []
 handler = None
 verbose = False
-sc = None
 
 if len(sys.argv) == 2 and sys.argv[1] == '-v':
     verbose = True
@@ -60,36 +59,6 @@ class Handler(queue.Queue):
                 return
             self.start_download(download)
 
-class RepeatedTimer(object):
-    def __init__(self, interval, function, *args, **kwargs):
-        self._timer     = None
-        self.interval   = interval
-        self.function   = function
-        self.args       = args
-        self.kwargs     = kwargs
-        self.is_running = False
-        self.start()
-
-    def _run(self):
-        id = self.args[1]
-        if get_download_status(id) == 3:
-            print ("stopping thread")
-            self.stop()
-        else:
-            print ("run another iteration")
-            self.is_running = False
-            self.start()
-            self.function(*self.args, **self.kwargs)
-
-    def start(self):
-        if not self.is_running:
-            self._timer = threading.Timer(self.interval, self._run)
-            self._timer.start()
-            self.is_running = True
-
-    def stop(self):
-        self._timer.cancel()
-        self.is_running = False
 
 def add_uri(ws, download):
     if verbose:
@@ -97,13 +66,6 @@ def add_uri(ws, download):
     if download is None or folder_size>=conf['size_limit']:
         return
     msg = JSONer("down_" + str(download.id), 'aria2.addUri', [[download.link]])
-    ws.send(msg)
-
-def get_status(ws, id=None, gid=None):
-    if id:
-        gid = get_gid_from_id(id)
-    msg = JSONer("stat", 'aria2.tellStatus', [gid, ['gid', 'files']])
-    print ("Getting status")
     ws.send(msg)
 
 
@@ -131,9 +93,6 @@ def set_download_gid(id, gid):
         if d.id == int(id):
             d.gid = gid
 
-def send_status(id, completedLength, fileSize, username):
-    progress = int(float(completedLength)/float(fileSize) * 100)
-    sc.emit('status', {'id': id, 'progress': progress}, room=username, namespace='/progress')
 
 def find_supported_handler(download):
     for handler in handlerLst:
@@ -154,8 +113,8 @@ def on_message(ws, message):
                     handler = Handler(ws)
                     handlerLst.append(handler)
                 handler.add_to_queue(download)
-                print ("in download")
-                rt = RepeatedTimer(1, get_status, ws, download.id, None)
+                if verbose:
+                    print ("in download")
             handler.join()
     elif 'id' in data:
         txt = data['id'].split('_')
@@ -177,17 +136,13 @@ def on_message(ws, message):
             raw_size = int(data['result']['files'][0]['length'])
             completedLength = data['result']['files'][0]['completedLength']
             set_name(data['result']['gid'], path[-1])
-            set_size(data['result']['gid'], raw_size)
-            download_id = get_id_from_gid(gid)
-            username = get_username_from_gid(gid)
-            send_status(download_id, completedLength, raw_size, username)
+            set_size(data['result']['gid'], fileSize)
             # msg='Your download '+path[-1]+' is completed.'
             # send_mail([get_download_email(data['result']['gid'])],msg)
     elif 'method' in data:
         if data['method'] == "aria2.onDownloadComplete":
             db_lock.acquire()
             update_status_gid(data['params'][0]['gid'], Status.COMPLETED, True)
-            get_status(ws, None, data['params'][0]['gid'])
             db_lock.release()
 
 
@@ -203,9 +158,8 @@ def on_open(ws):
     initialize(ws)
 
 
-def starter(socket):
-    global folder_size, handler, sc
-    sc = socket
+def starter():
+    global folder_size, handler
     remove_files(conf['max_age'], conf['min_rating'])
     folder_size=get_size(conf['down_folder'])
     websocket.enableTrace(False)

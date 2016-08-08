@@ -5,23 +5,9 @@
     .controller('DashCtrl', [ '$scope', 'ToastService', 'DashService', 'UserService', 'BassaUrl', DashCtrl]);
 
   function DashCtrl($scope, ToastService, DashService, UserService, BassaUrl) {
-    var socket = io.connect(BassaUrl + '/progress');
     $scope.dlink = {link: ''};
     $scope.downloads = [];
     $scope.username = UserService.getUsername();
-
-    socket.on('connect', function(){
-      socket.emit('join', {room: $scope.username});
-    });
-
-    socket.on('status', function(data) {
-      _.forEach($scope.downloads, function(obj){
-        if (obj.id == data.id) {
-          obj.progress = data.progress;
-          $scope.$apply();
-        }
-      });
-    });
 
     $scope.addLink = function() {
       if ($scope.dlink.link === "" || $scope.dlink.link === undefined) {
