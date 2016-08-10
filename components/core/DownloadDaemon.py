@@ -100,6 +100,12 @@ def find_supported_handler(download):
             return handler
     return None
 
+def get_status(ws, id=None, gid=None):
+    if id:
+        gid = get_gid_from_id(id)
+    msg = JSONer("stat", 'aria2.tellStatus', [gid, ['gid', 'files']])
+    ws.send(msg)
+
 def on_message(ws, message):
     global handler, folder_size
     data = json.loads(message)
@@ -126,7 +132,6 @@ def on_message(ws, message):
             update_status_gid(gid, Status.STARTED)
             db_lock.release()
         elif data['id']=="stat":
-            print (data)
             gid = data['result']['gid']
             db_lock.acquire()
             set_path(data['result']['gid'], data['result']['files'][0]['path'])
@@ -136,7 +141,7 @@ def on_message(ws, message):
             raw_size = int(data['result']['files'][0]['length'])
             completedLength = data['result']['files'][0]['completedLength']
             set_name(data['result']['gid'], path[-1])
-            set_size(data['result']['gid'], fileSize)
+            set_size(data['result']['gid'], raw_size)
             # msg='Your download '+path[-1]+' is completed.'
             # send_mail([get_download_email(data['result']['gid'])],msg)
     elif 'method' in data:
@@ -144,6 +149,7 @@ def on_message(ws, message):
             db_lock.acquire()
             update_status_gid(data['params'][0]['gid'], Status.COMPLETED, True)
             db_lock.release()
+            get_status(ws, None, data['params'][0]['gid'])
 
 
 def on_error(ws, error):
