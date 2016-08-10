@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS `download` (
   `rating` tinyint(4) NOT NULL DEFAULT '0',
   `gid` varchar(256) DEFAULT NULL,
   `completed_time` bigint(20) NOT NULL DEFAULT '0',
-  `size` varchar(7) NOT NULL DEFAULT '0',
+  `size` bigint(20) NOT NULL DEFAULT '0',
   `path` text,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id` (`id`),
